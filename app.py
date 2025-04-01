@@ -2,25 +2,26 @@ from flask import Flask, render_template, jsonify, send_file, request
 import pandas as pd
 import json
 import s2cell
+from os.path import relpath
 
 app = Flask(__name__)
 
 # DATA PREPARATION
 
-mentions = pd.read_csv("/static/litLongData/locationmentions.csv")
-documents = pd.read_csv("/static/litLongData/documents_genre.csv")
+mentions = pd.read_csv("litLongData/locationmentions.csv")
+documents = pd.read_csv("litLongData/documents_genre.csv")
 documents['forename'] = documents['forename'].fillna("").replace(r"^ +| +$", r"", regex=True)
 documents['surname'] = documents['surname'].fillna("").replace(r"^ +| +$", r"", regex=True)
 documents = documents[documents['genre']=="crime and mystery"]
 authors = documents[['forename', 'surname', 'gender']].drop_duplicates().sort_values(by='surname')
 books = documents[['title']].drop_duplicates().sort_values(by='title')
 print(authors)
-sentences = pd.read_csv("/static/litLongData/sentences.csv")
+sentences = pd.read_csv("litLongData/sentences.csv")
 # merging mentions and documents
 merged = pd.merge(mentions, documents, on='document_id', how='left')
 # filtering for crime and mystery
 merged = merged[merged['genre']=="crime and mystery"]
-locations = pd.read_csv("/static/litLongData/locations.csv")
+locations = pd.read_csv("litLongData/locations.csv")
 # merging locations with mentions and documents
 merged = pd.merge(merged, locations, left_on='location_id', right_on='id', how='left')
 # merging with sentences
