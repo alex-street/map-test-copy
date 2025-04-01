@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Display buildings in 3D</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
+<script src="https://unpkg.com/three@0.126.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="../static/style.css">
+</head>
+<body>
+  <div class="filterbar">
+    <div class="heading">
+      <h1 class="spooky">Build Your Spooky Tour of Edinburgh</h1>
+    </div>
+          <div class="item dark" style="padding: 0; margin: 0;">
+        <h5 style="padding-left: 10px; padding-right:10px; margin: 0;">Display the list of literary mentions across Edinburgh for a specific timeframe, author, book, and location!</h5>
+      </div>
+    <div id="filterlistings" class="listings">
+
+      <form id="filter-form">
+      <div id="" class="item">
+        <a class="title">Year</a>
+        <div>
+          <label for="fyear">From: </label>
+          <input type="text" id="fyear" name="fyear" size="4">
+          <label for="tyear">To: </label>
+          <input type="text" id="tyear" name="tyear" size="4">
+        </div>
+      </div>
+      <div id="" class="item">
+        <a class="title">Author</a>
+        <div>
+          <select id="author_list" name="author">
+            <option value="*//"> </option>
+          </select>
+        </div>
+      </div>
+      <div id="" class="item">
+        <a class="title">Book</a>
+        <div>
+          <select id="book_list" name="title">
+            <option value="*"> </option>
+            <!-- Add more options as needed -->
+          </select>
+        </div>
+      </div>
+      <div id="" class="item">
+        <a class="title">Location</a>
+        <div>
+          <select id="location_list" name="location">
+            <option value="*"> </option>
+            <!-- Add more options as needed -->
+          </select>
+        </div>
+      </div>
+      <div class="item">
+        <input type="submit" value="Submit" />
+      </div>
+    </form>
+    </div>
+  
+  </div>
+  <div class="sidebar">
+    <div class="heading spooky">
+      <h1>Available Book Mentions</h1>
+    </div>
+    <div class="dark" style="padding: 0; margin: 0;">
+      <h5 style="padding-left: 10px; padding-right:10px; margin: 0;" id="summary"></h5>
+    </div>
+    <div id="listings" class="listings"></div>
+  </div>
+  <div class="legend">
+    <div class="heading spooky">
+      <h1>Legend</h1>
+    </div>
+    <div >
+      <img src="../static/label.jpg" width="35" height="35" style="margin-top: 8px;">
+      <p class="text"># of mentions per bin</p>
+    </div>
+  </div>
+  <div id="map"></div>
+
+
+  <script>
+    async function init() {
+      // Setting up MapBox
+      const {MapboxOverlay, GridLayer, TextLayer} = deck;
+      // Getting mentions data
+
+      const response = await fetch('/get_lat_long');
+      const locations = await response.json();
+
+      const response2 = await fetch('/get_mentions');
+      const mentions = await response2.json();
+
+      const response3 = await fetch('/get_authors');
+      const authors = await response3.json();
+    
+      const response4 = await fetch('/get_books');
+      const books = await response4.json();
+
+      const author_list = document.getElementById('author_list');
+      authors.forEach((author) => {
+        const author_option = author_list.appendChild(document.createElement('option'));
+        author_option.value=author.surname + "//" + author.forename;
+        author_option.innerHTML = author.surname + ", " + author.forename;
+      });
+
+      const book_list = document.getElementById('book_list');
+      books.forEach((book) => {
+        const book_option = book_list.appendChild(document.createElement('option'));
+        book_option.value=book.title;
+        book_option.innerHTML = book.title;
+      });
+
+
+    const location_list = document.getElementById('location_list');
+
+    locations.forEach((location) => {
+        const location_option = location_list.appendChild(document.createElement('option'));
+        location_option.value=location.text;
+        location_option.innerHTML = location.text;
+      });
+
+      mapboxgl.accessToken = 'pk.eyJ1IjoiYWJyYWRzdHJlZXQiLCJhIjoiY203cWk0eHI1MG85MDJxc2RsdWxhams1ZyJ9.6BgTI4psEojyICyZFsFHlw';
+      // Creating ...
+      const filterGroup = document.getElementById('filter-group');
+      // Create MapBox object
+      const map = new mapboxgl.Map({
+          // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+          style: 'mapbox://styles/abradstreet/cm8p2isbh005w01skga8y2x6g/draft',
+          center: [-3.195, 55.95],
+          zoom: 14,
+          pitch: 70,
+          bearing: -17.6,
+          container: 'map',
+          antialias: true,
+          minZoom: 12
+      });
+    map.dragRotate.enable();
+    map.touchZoomRotate.enable();
+   
+    
+    
+  
+
+    map.on('style.load', () => {
+    
+
+      // Adding Terrain as a source source
+      map.addSource('mapbox-dem', {
+            'type': 'raster-dem',
+            'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            'tileSize': 512,
+            'maxzoom': 14
+        });
+      
+      function renderEverything(mentionsData) {
+          // Adding mentions as a source source
+        if (map.getSource("mentions")) {
+          map.removeSource('mentions');
+        }
+        map.addSource('mentions', {
+          type: 'geojson',
+          data: mentionsData
+        });
+
+        // add the DEM source as a terrain layer with exaggerated height
+        //map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+
+        //map.addLayer(customLayer);
+
+        let grid = {};
+    let gridLabels = [];
+
+    function getGridCorners([lat, lon], gridSize) {
+        // Convert grid size from meters to degrees
+        const latDegPerMeter = 1 / 111320; // Approximate conversion for latitude
+        const lonDegPerMeter = 1 / (111320 * Math.cos(lat * Math.PI / 180)); // Adjust for longitude
+
+        let latStep = gridSize * latDegPerMeter;
+        let lonStep = gridSize * lonDegPerMeter;
+
+        // Find the nearest grid cell's top-left corner
+        let snappedLat = Math.floor(lat / latStep) * latStep;
+        let snappedLon = Math.floor(lon / lonStep) * lonStep;
+
+        // Define the four corners of the cell
+        let topLeft = [snappedLat, snappedLon];
+        let topRight = [snappedLat, snappedLon + lonStep];
+        let bottomLeft = [snappedLat + latStep, snappedLon];
+        let bottomRight = [snappedLat + latStep, snappedLon + lonStep];
+
+        const key = `${snappedLat},${snappedLon}`;
+
+        if (key in grid) {
+            grid[key] += 1;
+        } else {
+            grid[key] = 1;
+        }
+
+        let num = grid[key];
+        
+        return [[topLeft, topRight, bottomLeft, bottomRight], num];
+    }
+
+
+        let gridLabelFeatures1 = [];
+        let gridLabelFeatures2 = [];
+        let gridLabelFeatures3 = [];
+        function makePolyGeo(gridSize, layerNum) {
+          let features = [];
+          grid = {};
+          let i = 0;
+          mentionsData.features.forEach((mention) => {
+            console.log(mention)
+            let [[topLeft, topRight, bottomLeft, bottomRight], num] = getGridCorners(mention.geometry.coordinates, gridSize)
+            console.log(num)
+            let feature = {
+              type: "Feature",
+              properties: {
+                  height: 30*num, // Number of times this grid was used
+                  num: num,
+                  base_height: ((num-1)*30),
+                  color: "orange",
+                  orig_coords: mention.geometry.coordinates,
+                  title: mention.properties.title,
+                  forename: mention.properties.forename,
+                  surname: mention.properties.surname,
+                  genre: mention.properties.genre,
+                  gender: mention.properties.gender,
+                  text: mention.properties.text,
+                  sentence: mention.properties.sentence
+              },
+              geometry: {
+                  type: "Polygon",
+                  coordinates: [[topLeft, topRight, bottomRight, bottomLeft, topLeft]]
+              },
+              id: i
+            }
+            features.push(feature);
+            i++;
+          });
+
+          console.log(grid)
+          Object.getOwnPropertyNames(grid).forEach(key => {
+              //console.log(`${key}: ${grid[key]}`);
+              let labelFeature = {
+                type: "Feature",
+                geometry: {
+                    type: "Point",
+                    coordinates: key.split(",").map(Number)
+                },
+                properties: {
+                    title: grid[key],
+                    height: grid[key]*30,
+                    priority: 1/grid[key]
+                }
+            }
+            if (layerNum == 1) {
+              gridLabelFeatures1.push(labelFeature);
+            }
+            else if (layerNum == 2) {
+              gridLabelFeatures2.push(labelFeature);
+            }
+            else {
+              gridLabelFeatures3.push(labelFeature);
+            }
+            
+          });
+
+          return {
+              type: "FeatureCollection",
+              features: features
+          };
+        }
+
+
+        
+
+        const poly1 = makePolyGeo(100, 1);
+        console.log(poly1)
+
+        if (map.getLayer("polygon-fills")) {
+          map.removeLayer('polygon-fills');
+        }
+        if (map.getSource("poly1")) {
+          map.removeSource('poly1');
+        }
+        map.addSource('poly1', {
+          type: 'geojson',
+          data: poly1
+        });
+
+        const poly2 = makePolyGeo(400, 2);
+        console.log(poly2)
+
+        if (map.getLayer("polygon-fills-2")) {
+          map.removeLayer('polygon-fills-2');
+        }
+        if (map.getSource("poly2")) {
+          map.removeSource('poly2');
+        }
+        map.addSource('poly2', {
+          type: 'geojson',
+          data: poly2
+        });
+
+        const poly3 = makePolyGeo(50, 3);
+        console.log(poly3)
+
+        if (map.getLayer("polygon-fills-3")) {
+          map.removeLayer('polygon-fills-3');
+        }
+        if (map.getSource("poly3")) {
+          map.removeSource('poly3');
+        }
+        map.addSource('poly3', {
+          type: 'geojson',
+          data: poly3
+        });
+
+
+        map.addLayer({
+              'id': 'polygon-fills',
+              'type': 'fill-extrusion',
+              'source': 'poly1',
+              'paint': {
+                  // Get the `fill-extrusion-color` from the source `color` property.
+                  //'fill-extrusion-color': ['get', 'color'],
+
+                  // Get `fill-extrusion-height` from the source `height` property.
+                  'fill-extrusion-height': ['get', 'height'],
+
+                  // Get `fill-extrusion-base` from the source `base_height` property.
+                  'fill-extrusion-base': ['get', 'base_height'],
+
+                  // Make extrusions slightly opaque to see through indoor walls.
+                  'fill-extrusion-opacity': 0.9,
+
+                  'fill-extrusion-color': [
+                    'case',
+                    ['boolean', ['feature-state', 'hovered'], false],
+                    'red', // if selected true, paint in blue
+                    'orange' // else paint in gray
+                  ]
+                  
+              },
+              'filter': ['==', '$type', 'Polygon'],
+              'minzoom': 13,
+              'maxzoom': 15
+
+          });
+
+
+          map.addLayer({
+              'id': 'polygon-fills-2',
+              'type': 'fill-extrusion',
+              'source': 'poly2',
+              'paint': {
+                  // Get the `fill-extrusion-color` from the source `color` property.
+                  //'fill-extrusion-color': ['get', 'color'],
+
+                  // Get `fill-extrusion-height` from the source `height` property.
+                  'fill-extrusion-height': ['get', 'height'],
+
+                  // Get `fill-extrusion-base` from the source `base_height` property.
+                  'fill-extrusion-base': ['get', 'base_height'],
+
+                  // Make extrusions slightly opaque to see through indoor walls.
+                  'fill-extrusion-opacity': 0.9,
+                  'fill-extrusion-color': [
+                    'case',
+                    ['boolean', ['feature-state', 'hovered'], false],
+                    'red', // if selected true, paint in blue
+                    'orange' // else paint in gray
+                  ]
+              },
+              'maxzoom': 13
+
+          });
+
+          map.addLayer({
+              'id': 'polygon-fills-3',
+              'type': 'fill-extrusion',
+              'source': 'poly3',
+              'paint': {
+                  // Get the `fill-extrusion-color` from the source `color` property.
+                  //'fill-extrusion-color': ['get', 'color'],
+
+                  // Get `fill-extrusion-height` from the source `height` property.
+                  'fill-extrusion-height': ['get', 'height'],
+
+                  // Get `fill-extrusion-base` from the source `base_height` property.
+                  'fill-extrusion-base': ['get', 'base_height'],
+
+                  // Make extrusions slightly opaque to see through indoor walls.
+                  'fill-extrusion-opacity': 0.9,
+                
+                  'fill-extrusion-color': [
+                    'case',
+                    ['boolean', ['feature-state', 'hovered'], false],
+                    'red', // if selected true, paint in blue
+                    'orange']
+              },
+              'minzoom': 15
+
+          });
+
+
+                // Create a popup, but don't add it to the map yet.
+          const popup = new mapboxgl.Popup({
+              closeButton: false,
+              closeOnClick: false
+          });
+
+          var polygonID = null;
+          map.on('mouseenter', 'polygon-fills', (e) => {
+              // Change the cursor style as a UI indicator.
+              map.getCanvas().style.cursor = 'pointer';
+
+              // Copy coordinates array.
+              const [lng, lat] = JSON.parse(e.features[0].properties.orig_coords);
+              const coordinates = {lng: lng, lat: lat}
+              console.log(coordinates)
+
+              function describe(properties) {
+                d = "<h3>Title: " + properties.title + "</h3>"
+                d += "<div>"
+                d += "<p>Author: " + properties.forename + " " + properties.surname + "</p>"
+                d += "<p>Genre: " + properties.genre + "</p>"
+                d += "<p>Location: " + properties.text + "</p>"
+                d += "<p>sentence: " + properties.sentence + "</p>"
+                d += "</div>"
+
+                return d
+              }
+              const description = describe(e.features[0].properties);
+
+              // Ensure that if the map is zoomed out such that multiple
+              // copies of the feature are visible, the popup appears
+              // over the copy being pointed to.
+              if (['mercator', 'equirectangular'].includes(map.getProjection().name)) {
+                  while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                  }
+              }
+
+              // Populate the popup and set its coordinates
+              // based on the feature found.
+              popup.setLngLat(coordinates).setHTML(description).addTo(map);
+              console.log(e)
+
+              if (polygonID) {
+                map.setFeatureState(
+                    { source: 'poly1', id: polygonID },
+                    { hovered: false }
+                );
+              }
+              polygonID = e.features[0].id;
+              map.setFeatureState(
+                { source: 'poly1', id: polygonID },
+                { hovered: true }
+            );
+
+          });
+
+          map.on('mouseleave', 'polygon-fills', () => {
+              map.getCanvas().style.cursor = '';
+              popup.remove();
+              map.setFeatureState(
+                    { source: 'poly1', id: polygonID },
+                    { hovered: false }
+                );
+          });
+
+
+          map.on('mouseenter', 'polygon-fills-2', (e) => {
+              // Change the cursor style as a UI indicator.
+              map.getCanvas().style.cursor = 'pointer';
+
+              // Copy coordinates array.
+              const [lng, lat] = JSON.parse(e.features[0].properties.orig_coords);
+              const coordinates = {lng: lng, lat: lat}
+              console.log(coordinates)
+
+              function describe(properties) {
+                d = "<h3>Title: " + properties.title + "</h3>"
+                d += "<div>"
+                d += "<p>Author: " + properties.forename + " " + properties.surname + "</p>"
+                d += "<p>Genre: " + properties.genre + "</p>"
+                d += "<p>Location: " + properties.text + "</p>"
+                d += "<p>sentence: " + properties.sentence + "</p>"
+                d += "</div>"
+
+                return d
+              }
+              const description = describe(e.features[0].properties);
+
+              // Ensure that if the map is zoomed out such that multiple
+              // copies of the feature are visible, the popup appears
+              // over the copy being pointed to.
+              if (['mercator', 'equirectangular'].includes(map.getProjection().name)) {
+                  while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                  }
+              }
+
+              // Populate the popup and set its coordinates
+              // based on the feature found.
+              popup.setLngLat(coordinates).setHTML(description).addTo(map);
+              if (polygonID) {
+                map.setFeatureState(
+                    { source: 'poly2', id: polygonID },
+                    { hovered: false }
+                );
+              }
+              polygonID = e.features[0].id;
+              map.setFeatureState(
+                { source: 'poly2', id: polygonID },
+                { hovered: true }
+            );
+          });
+
+          map.on('mouseleave', 'polygon-fills-2', () => {
+              map.getCanvas().style.cursor = '';
+              popup.remove();
+              map.setFeatureState(
+                    { source: 'poly1', id: polygonID },
+                    { hovered: false }
+                );
+          });
+
+          map.on('mouseenter', 'polygon-fills-3', (e) => {
+              // Change the cursor style as a UI indicator.
+              map.getCanvas().style.cursor = 'pointer';
+
+              // Copy coordinates array.
+              const [lng, lat] = JSON.parse(e.features[0].properties.orig_coords);
+              const coordinates = {lng: lng, lat: lat}
+              console.log(coordinates)
+
+              function describe(properties) {
+                d = "<h3>Title: " + properties.title + "</h3>"
+                d += "<div>"
+                d += "<p>Author: " + properties.forename + " " + properties.surname + "</p>"
+                d += "<p>Genre: " + properties.genre + "</p>"
+                d += "<p>Location: " + properties.text + "</p>"
+                d += "<p>sentence: " + properties.sentence + "</p>"
+                d += "</div>"
+
+                return d
+              }
+              const description = describe(e.features[0].properties);
+
+              // Ensure that if the map is zoomed out such that multiple
+              // copies of the feature are visible, the popup appears
+              // over the copy being pointed to.
+              if (['mercator', 'equirectangular'].includes(map.getProjection().name)) {
+                  while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                  }
+              }
+
+              // Populate the popup and set its coordinates
+              // based on the feature found.
+              popup.setLngLat(coordinates).setHTML(description).addTo(map);
+              if (polygonID) {
+                map.setFeatureState(
+                    { source: 'poly3', id: polygonID },
+                    { hovered: false }
+                );
+              }
+              polygonID = e.features[0].id;
+              map.setFeatureState(
+                { source: 'poly3', id: polygonID },
+                { hovered: true }
+            );
+          });
+
+          map.on('mouseleave', 'polygon-fills-3', () => {
+              map.getCanvas().style.cursor = '';
+              popup.remove();
+              map.setFeatureState(
+                    { source: 'poly3', id: polygonID },
+                    { hovered: false }
+                );
+          });
+
+      
+
+    /*    // Adding layer containing labels of the title of each book
+        map.addLayer({
+            'id': 'mentions-labels',
+            'type': 'symbol',
+            'source': 'mentions',
+            'layout': {
+                'text-field': ['get', 'title'],
+                //'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+                'text-radial-offset': 0.5,
+                'text-justify': 'auto',
+                //'icon-image': ['get', 'icon']
+            }
+        }); */
+
+        const labels1 =  {
+              type: "FeatureCollection",
+              features: gridLabelFeatures1
+          };
+
+          if (map.getLayer("labels-text-1")) {
+          map.removeLayer('labels-text-1');
+        }
+        if (map.getSource("labels1")) {
+          map.removeSource("labels1")
+        }
+          map.addSource('labels1',{
+          type: 'geojson',
+          data: labels1
+        });
+
+        const labels2 =  {
+              type: "FeatureCollection",
+              features: gridLabelFeatures2
+          };
+
+
+          if (map.getLayer("labels-text-2")) {
+          map.removeLayer('labels-text-2');
+        }
+        if (map.getSource("labels2")) {
+          map.removeSource("labels2")
+        }
+      
+          map.addSource('labels2',{
+          type: 'geojson',
+          data: labels2
+        });
+
+        const labels3 =  {
+              type: "FeatureCollection",
+              features: gridLabelFeatures3
+          };
+
+      
+          if (map.getLayer("labels-text-3")) {
+          map.removeLayer('labels-text-3');
+        }
+        if (map.getSource("labels3")) {
+          map.removeSource("labels3")
+        }
+          map.addSource('labels3',{
+          type: 'geojson',
+          data: labels3
+        });
+
+    
+        map.addLayer({
+                      'id': 'labels-text-1',
+                      'type': 'symbol',
+                      'source': 'labels1',
+                      'layout': {
+                          //'icon-image': 'custom-marker',
+                          // get the title name from the source's "title" property
+                          'text-field': ['get', 'title'],
+      
+                          'text-justify': 'auto',
+                          'text-padding': 20,
+                          'symbol-z-elevate': true,
+                          'icon-image': ['get', 'icon'],
+                          "symbol-sort-key": ["get", "priority"]
+                      },
+                      "paint": {
+                  "text-color": "#202",
+                  "text-halo-color": "#fff",
+                  "text-halo-width": 2
+              },
+              'minzoom': 13,
+              'maxzoom': 15
+                  });
+
+                  map.addLayer({
+                      'id': 'labels-text-2',
+                      'type': 'symbol',
+                      'source': 'labels2',
+                      'layout': {
+                          //'icon-image': 'custom-marker',
+                          // get the title name from the source's "title" property
+                          'text-field': ['get', 'title'],
+      
+                          'text-justify': 'auto',
+                          'text-padding': 20,
+                          'symbol-z-elevate': true,
+                          'icon-image': ['get', 'icon'],
+                          "symbol-sort-key": ["get", "priority"]
+                      },
+                      "paint": {
+                  "text-color": "#202",
+                  "text-halo-color": "#fff",
+                  "text-halo-width": 2
+              },
+              'maxzoom': 13
+                  });
+
+
+
+                  map.addLayer({
+                      'id': 'labels-text-3',
+                      'type': 'symbol',
+                      'source': 'labels3',
+                      'layout': {
+                          //'icon-image': 'custom-marker',
+                          // get the title name from the source's "title" property
+                          'text-field': ['get', 'title'],
+      
+                          'text-justify': 'auto',
+                          'text-padding': 30,
+                          'symbol-z-elevate': true,
+                          'icon-image': ['get', 'icon'],
+                          "symbol-sort-key": ["get", "priority"]
+                      },
+                      "paint": {
+                  "text-color": "#202",
+                  "text-halo-color": "#fff",
+                  "text-halo-width": 2
+              },
+              'minzoom': 15
+                  });
+
+        
+        const zoom = map.getZoom();
+
+
+        // this function computes the cellID that the mention belongs to (x and y values)
+        function aggr(pos, size, offset) {
+                //console.log(pos);
+                const [lon, lat] = pos;
+                const [minLon, minLat] = [-3.205, 55.95]
+                //const properties = feature.properties;
+                const cellSizeLat = size/111195;
+                const cellSizeLon = size/62259;
+                const xIndex = Math.floor((lon-minLon-.0332)/ cellSizeLon);
+                //-(1450/size)
+                const yIndex = Math.floor((lat-minLat-0.0014)/ cellSizeLat);
+                //--(150/size
+                const binKey = `${xIndex}-${yIndex}`;
+                //console.log(binKey)
+                return [xIndex, yIndex]
+        }
+
+      }
+      renderEverything(mentions);
+
+      buildLocationList(mentions);
+
+/* 
+    locations.forEach(item => {
+
+      //console.log(`Lat: ${item.lat}, Lon: ${item.lon}`);
+
+      const el = document.createElement('div');
+      el.className = 'marker';
+
+      el.className = 'marker';
+       new mapboxgl.Marker(el).setLngLat([item.lon, item.lat])
+      .setPopup(
+            new mapboxgl.Popup({ offset: 25 }) // add popups
+              .setHTML(
+                `<h3>${item.text}</h3><p>${item.freq}</p>`
+              )
+          ).addTo(map); 
+
+      
+    }); */
+
+
+
+
+
+  function buildLocationList(mentions) {
+    const listings = document.getElementById('listings');
+    let summary = "Displaying " + mentions.features.length + " mention(s)"
+    let uniqueLocations = []
+    let uniqueAuthors = []
+    let uniqueBooks = []
+    listings.innerHTML = "";
+    for (const mention of mentions.features) {
+      if (!uniqueLocations.includes(mention.properties.text)) {
+        uniqueLocations.push(mention.properties.text)
+      }
+      if (!uniqueAuthors.includes(mention.properties.surname+mention.properties.forename)) {
+        uniqueAuthors.push(mention.properties.surname+mention.properties.forename)
+      }
+      if (!uniqueBooks.includes(mention.properties.title)) {
+        uniqueBooks.push(mention.properties.title)
+      }
+      /* Add a new listing section to the sidebar. */
+      const listing = listings.appendChild(document.createElement('div'));
+      /* Assign a unique `id` to the listing. */
+      listing.id = `listing-${mention.properties.id}`;
+      /* Assign the `item` class to each listing for styling. */
+      listing.className = 'item';
+
+      /* Add the link to the individual listing created above. */
+      const link = listing.appendChild(document.createElement('a'));
+      link.className = 'title';
+      link.id = `link-${mention.properties.id}`;
+      link.innerHTML = `${mention.properties.title}`;
+
+      /* Add details to the individual listing. */
+      const details = listing.appendChild(document.createElement('div'));
+      details.innerHTML = `${mention.properties.text}`;
+      details.innerHTML += ` | ${mention.properties.surname}`;
+
+      link.addEventListener('click', function () {
+      for (const feature of mentions.features) {
+        if (this.id === `link-${feature.properties.id}`) {
+          flyToStore(feature);
+          console.log(feature)
+          createPopUp(feature);
+
+        }
+      }
+      const activeItem = document.getElementsByClassName('active');
+      if (activeItem[0]) {
+        activeItem[0].classList.remove('active');
+      }
+      this.parentNode.classList.add('active');
+    });
+    }
+    summary += " across " + uniqueLocations.length + " locations in Edinburgh, referenced in " + uniqueBooks.length + " books written by " + uniqueAuthors.length + " authors:"
+    document.getElementById('summary').innerHTML = summary;
+
+  function flyToStore(currentFeature) {
+    map.flyTo({
+      center: currentFeature.geometry.coordinates,
+      zoom: 16
+    });
+}
+
+function createPopUp(currentFeature) {
+
+  if (['mercator', 'equirectangular'].includes(map.getProjection().name)) {
+                while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                    coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                }
+            }
+
+  const popup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: true
+        });
+
+  const [lng, lat] = currentFeature.geometry.coordinates;
+            const coordinates = {lng: lng, lat: lat}
+            console.log(coordinates)
+
+            function describe(properties) {
+              d = "<h3>Title: " + properties.title + "</h3>"
+              d += "<div>"
+              d += "<p>Author: " + properties.forename + " " + properties.surname + "</p>"
+              d += "<p>Genre: " + properties.genre + "</p>"
+              d += "<p>Location: " + properties.text + "</p>"
+              d += "<p>sentence: " + properties.sentence + "</p>"
+               d += "</div>"
+
+              return d
+            }
+            const description = describe(currentFeature.properties);
+
+            
+
+            // Populate the popup and set its coordinates
+            // based on the feature found.
+            popup.setLngLat(coordinates).setHTML(description).addTo(map);
+
+  }
+}
+
+    // Change the cursor to a pointer when the mouse is over the places layer.
+    map.on('mouseenter', 'polygon-fills', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+
+        // Change it back to a pointer when it leaves.
+        map.on('mouseleave', 'polygon-fills', () => {
+            map.getCanvas().style.cursor = '';
+            popup.remove();
+        });
+
+$(document).ready(function() {
+      // Handle form submission using AJAX
+      $('#filter-form').submit(function(event) {
+          event.preventDefault();  // Prevent the form from refreshing the page
+
+          // Get form data
+          var formData = $(this).serialize();
+
+          // Submit the form data using AJAX
+          $.ajax({
+              url: '/submit',
+              type: 'POST',
+              data: formData,
+              success: function(response) {
+                console.log(JSON.parse(response));
+                buildLocationList(JSON.parse(response));
+                renderEverything(JSON.parse(response))
+              }
+          });
+      });
+  });
+      
+    });
+
+}  
+  init();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,210 @@
+@font-face { font-family: NightmarePills; src: url('NightmarePills-BV2w.ttf'); } 
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: #404040;
+  font:
+    400 15px/22px 'Source Sans Pro',
+    'Helvetica Neue',
+    sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.spooky {
+  font-family: 'NightmarePills';
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0;
+  font-weight: 400;
+  line-height: 20px;
+  padding: 20px 2px;
+}
+
+a {
+  color: #404040;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #101010;
+}
+
+/* The page is split between map and sidebar - the sidebar gets 1/3, map
+gets 2/3 of the page. You can adjust this to your personal liking. */
+
+.sidebar {
+  position: absolute;
+  width: 25%;
+  height: 63%;
+  top: 25%;
+  left: 0;
+  overflow: hidden;
+  border-right: 1px solid rgb(0 0 0 / 25%);
+  background-color: #405c54;
+}
+
+.filterbar {
+  position: absolute;
+  width: 25%;
+  height: 25%;
+  top: 0;
+  overflow: hidden;
+  border-right: 1px solid rgb(0 0 0 / 25%);
+  background-color: #405c54;
+}
+
+.legend {
+  position: absolute;
+  width: 25%;
+  height: 12%;
+  top: 88%;
+  overflow: hidden;
+  border-right: 1px solid rgb(0 0 0 / 25%);
+  background-color: #405c54;
+}
+
+.text {
+  display: inline-block;
+  vertical-align: top;
+  color: #eee;
+}
+
+#map {
+  position: absolute;
+  left: 25%;
+  width: 75%;
+  top: 0;
+  bottom: 0;
+}
+
+.heading {
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  height: 60px;
+  line-height: 60px;
+  padding: 0 10px;
+}
+.marker {
+/* background-image: url('https://pngimg.com/d/book_PNG51076.png'); */
+background-size: cover;
+background-color: #fff;
+
+border-radius: 0%;
+cursor: pointer;
+}
+.listings {
+    height: 100%;
+    overflow: auto;
+    padding-bottom: 110px;
+  }
+  
+  .listings .item {
+    border-bottom: 1px solid #eee;
+    padding: 10px;
+    text-decoration: none;
+    color:#fff;
+  }
+  
+  .listings .item:last-child {
+    border-bottom: none;
+  }
+  
+  .listings .item .title {
+    display: block;
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .dark {
+    background-color: #22302c;
+    color: #eee;
+  }
+  
+  .listings .item .title small {
+    font-weight: 400;
+  }
+  
+  .listings .item.active .title,
+  .listings .item .title:hover {
+    color: #aeaeae;
+  }
+  
+  .listings .item.active {
+    background-color: #575757;
+  }
+  
+  ::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+    border-left: 0;
+    background: rgba(0 0 0 0.1);
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: none;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #f0a414;
+    border-radius: 0;
+  }
+
+
+
+.mapboxgl-popup-close-button {
+    display: none;
+  } 
+  
+  .mapboxgl-popup-content {
+    font:
+      400 15px/22px 'Source Sans Pro',
+      'Helvetica Neue',
+      sans-serif;
+    padding: 0;
+    width: 280px;
+  }
+  
+  .mapboxgl-popup-content h3 {
+    background: #405c54;
+    color: #fff;
+    margin: 0;
+    padding: 10px;
+    border-radius: 3px 3px 0 0;
+    font-weight: 700;
+    margin-top: -15px;
+  }
+  
+  .mapboxgl-popup-content h4 {
+    margin: 0;
+    padding: 10px;
+    font-weight: 400;
+  }
+  
+  .mapboxgl-popup-content div {
+    padding: 10px;
+  }
+  
+  .mapboxgl-popup-anchor-top > .mapboxgl-popup-content {
+    margin-top: 15px;
+  }
+  
+  .mapboxgl-popup-anchor-top > .mapboxgl-popup-tip {
+    border-bottom-color: #405c54;
+  }
+
+  .mapboxgl-popup {
+    max-width: 400px;
+    padding: 10px;
+    font:
+        12px/20px 'Helvetica Neue',
+        Arial,
+        Helvetica,
+        sans-serif;
+}
