@@ -236,7 +236,8 @@
                   genre: mention.properties.genre,
                   gender: mention.properties.gender,
                   text: mention.properties.text,
-                  sentence: mention.properties.sentence
+                  sentence: mention.properties.sentence,
+                  pubyear: mention.properties.pubyear
               },
               geometry: {
                   type: "Polygon",
@@ -837,7 +838,7 @@
       this.parentNode.classList.add('active');
     });
     }
-    summary += " across " + uniqueLocations.length + " locations in Edinburgh, referenced in " + uniqueBooks.length + " books written by " + uniqueAuthors.length + " authors:"
+    summary += " across " + uniqueLocations.length + " location(s) in Edinburgh, referenced in " + uniqueBooks.length + " book(s) written by " + uniqueAuthors.length + " author(s):"
     document.getElementById('summary').innerHTML = summary;
 
   function flyToStore(currentFeature) {
