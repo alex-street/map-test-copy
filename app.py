@@ -12,7 +12,7 @@ mentions = pd.read_csv("litLongData/locationmentions.csv")
 documents = pd.read_csv("litLongData/documents_genre.csv")
 documents['forename'] = documents['forename'].fillna("").replace(r"^ +| +$", r"", regex=True)
 documents['surname'] = documents['surname'].fillna("").replace(r"^ +| +$", r"", regex=True)
-documents = documents[documents['genre']=="crime and mystery"]
+documents = documents[documents['genre']=="crime and mystery"] + documents[documents['genre']=="horror and ghost stories"] + documents[documents['genre']=="thrillers and suspense"]
 authors = documents[['forename', 'surname', 'gender']].drop_duplicates().sort_values(by='surname')
 books = documents[['title']].drop_duplicates().sort_values(by='title')
 print(authors)
@@ -20,7 +20,7 @@ sentences = pd.read_csv("litLongData/sentences.csv")
 # merging mentions and documents
 merged = pd.merge(mentions, documents, on='document_id', how='left')
 # filtering for crime and mystery
-merged = merged[merged['genre']=="crime and mystery"]
+merged = merged[merged['genre']=="crime and mystery"] + merged[merged['genre']=="horror and ghost stories"] + merged[merged['genre']=="thrillers and suspense"]
 locations = pd.read_csv("litLongData/locations.csv")
 # merging locations with mentions and documents
 merged = pd.merge(merged, locations, left_on='location_id', right_on='id', how='left')
