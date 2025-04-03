@@ -12,15 +12,17 @@ mentions = pd.read_csv("litLongData/locationmentions.csv")
 documents = pd.read_csv("litLongData/documents_genre.csv")
 documents['forename'] = documents['forename'].fillna("").replace(r"^ +| +$", r"", regex=True)
 documents['surname'] = documents['surname'].fillna("").replace(r"^ +| +$", r"", regex=True)
-documents = documents[documents['genre']=="crime and mystery"] + documents[documents['genre']=="horror and ghost stories"] + documents[documents['genre']=="thrillers and suspense"]
-authors = documents[['forename', 'surname', 'gender']].drop_duplicates().sort_values(by='surname')
-books = documents[['title']].drop_duplicates().sort_values(by='title')
+documents = documents.query("genre == ['crime and mystery','horror and ghost stories', 'thrillers and suspense']")
+
+authors = documents[['forename', 'surname', 'gender']].drop_duplicates().sort_values(by='surname').dropna(how='any')
+books = documents[['title']].drop_duplicates().sort_values(by='title').dropna(how='any')
 print(authors)
 sentences = pd.read_csv("litLongData/sentences.csv")
 # merging mentions and documents
-merged = pd.merge(mentions, documents, on='document_id', how='left')
+merged = pd.merge(mentions, documents, on='document_id', how='left').dropna(how='any')
 # filtering for crime and mystery
-merged = merged[merged['genre']=="crime and mystery"] + merged[merged['genre']=="horror and ghost stories"] + merged[merged['genre']=="thrillers and suspense"]
+merged = merged.query("genre == ['crime and mystery','horror and ghost stories', 'thrillers and suspense']")
+
 locations = pd.read_csv("litLongData/locations.csv")
 # merging locations with mentions and documents
 merged = pd.merge(merged, locations, left_on='location_id', right_on='id', how='left')
@@ -123,4 +125,4 @@ def submit():
     return json.dumps(filtered_geojson, indent=4)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0',debug=True)
+    app.run(host='127.0.0.1',debug=True)
